@@ -1,22 +1,22 @@
 # Code execution with MCP: separating context from computation
 
-**TL;DR:** Traditional tool calling eats away at an agent’s context window. All the tool definitions and every intermediate result pass through it. Code execution gives agents a "scratch pad" workspace to process data outside the context window. Combined with MCP's tool abstractions, this enables large token reductions and improved processing time over traditional tool calling.
+**TL;DR:** Traditional tool calling eats away at an agent's context window. All the tool definitions and every intermediate result pass through it. Code execution gives agents a "scratch pad" workspace to process data outside the context window. Combined with MCP's tool abstractions, this can significantly reduce token usage for data-heavy tasks.
 
 Check out the [demo repository](https://github.com/sarahcstringer/mcp-code-demo) for two examples you can run.
 
 ---
 
-I thought I understood MCP. [It took me a while](https://deatons.substack.com/p/learn-mcp-with-me-part-1-what-is), but I recognized that we need MCP as a standardized layer to best interact with external services. MCP gives LLMs structured access to APIs so they don’t fumble varying parameter names and request/response formats.
+I thought I understood MCP. [It took me a while](https://deatons.substack.com/p/learn-mcp-with-me-part-1-what-is), but I recognized that we need MCP as a standardized layer to best interact with external services. MCP gives LLMs structured access to APIs, providing a consistent interface instead of varying parameter names and request/response formats across different services.
 
 Then I read Anthropic's post about [code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) and Cloudflare's piece on [Code Mode](https://blog.cloudflare.com/code-mode/), which talk about having LLMs write code to call MCP servers, and I got confused again.
 
 Why are we having LLMs write code around MCP servers when we wrote MCP servers so that… LLMs **didn’t have to write code** to interact with APIs?
 
-The piece that finally clicked: the huge benefit of code execution is that it happens in an execution environment, not in the agent's context window.
+The piece that finally clicked: a key benefit of code execution is that it happens in an execution environment, not in the agent's context window.
 
-MCP is still the standardization layer; creating a code wrapper around the MCP tools turns them into regular functions the LLM can use. Then, if the LLM has access to a bash tool that executes commands, it can write and execute entire scripts in its execution environment and only send the final answer back to context.
+MCP is still the standardization layer; generating Python wrappers for MCP tools makes them available as importable functions in the execution environment. Then, if the LLM has access to a bash tool that executes commands, it can write and execute entire scripts in its execution environment and only send the final answer back to context.
 
-As an analogy: traditional tool calling forces you to show every single calculation on your final exam paper: all the messy scratch work, the raw data, the transformed versions, crossed-out mistakes. You run out of space fast, and the grader (the LLM) has to wade through all that noise to find the final answer. MCP + code execution is like giving you scratch paper to process data and perform operations outside the context window. Then you just record the final result on your exam paper.
+As an analogy: traditional tool calling requires you to show every single calculation on your final exam paper: all the messy scratch work, the raw data, the transformed versions, crossed-out mistakes. You run out of space fast, and the grader (the LLM) has to wade through all that noise to find the final answer. MCP + code execution is like giving you scratch paper to process data and perform operations outside the context window. Then you just record the final result on your exam paper.
 
 ## Context window vs. execution environment
 
@@ -43,19 +43,19 @@ If you want to fetch 300 records, transform the data, and filter it with tools, 
 - The transformed data  
 - The filtered data
 
-Each step consumes more of your expensive, limited window until you hit the limit or your costs explode. Your agent also has to sort through all the results and its working memory is crowded with information that isn’t actually relevant for its final response.
+Each step consumes more of your expensive, limited window until you hit the limit or face substantial cost increases. Your agent also has to sort through all the results and its working memory is crowded with information that isn't actually relevant for its final response.
 
 ## The solution: code execution in an execution environment
 
 Code execution gives agents a "scratch pad" workspace to process data outside the context window. It allows the agent to write code that calls MCP tools, process results locally in the execution environment, and only record the final result in context.
 
-![Comparison diagram showing traditional tool calling with all operations in the context window versus code execution with a separate execution environment for processing, demonstrating 82% token reduction](./mcp-code.png)
+![Comparison diagram showing traditional tool calling with all operations in the context window versus code execution with a separate execution environment for processing](./mcp-code.png)
 
 MCP still handles the "How do I call this API correctly?" problem by giving LLMs structured tools instead of making them write raw API calls that vary from API to API.
 
 Code execution solves the "How do I process all this data without destroying my context window?" problem by giving the agent a workspace to process data outside the context window.
 
-Beyond data processing, code execution unlocks capabilities that are challenging with traditional tool calling. Things like polling for results and waiting, retrying failed requests, maintaining state across multiple operations, saving intermediate results and returning back to them later, all become more natural through code.
+Beyond data processing, code execution unlocks capabilities that are challenging with traditional tool calling. Things like polling for results and waiting, retrying failed requests, maintaining state across multiple operations, saving intermediate results and returning back to them later, all become possible through code.
 
 ## Production safety: guardrails for code execution
 
@@ -75,18 +75,34 @@ Not every task needs code execution. Traditional tool calling works well for cer
 
 **Traditional tool calling works when:**
 
-- Tool results are small (a few hundred tokens)  
-- You need one or two tool calls total  
-- No data processing required  
+- Tool results are small (a few hundred tokens)
+- You need one or two tool calls total
+- No data processing required
 - Results go directly to the user
 
 **Code execution excels when:**
 
-- Processing large datasets  
-- Making multiple related tool calls  
-- Filtering or transforming results  
-- Polling or waiting for completion  
+- Processing large datasets
+- Making multiple related tool calls
+- Filtering or transforming results
+- Polling or waiting for completion
 - Maintaining state across operations
+
+## Limitations and trade-offs
+
+Code execution isn't without its challenges:
+
+**Model capability matters:** Code execution requires models with strong coding abilities. Not all LLMs write clean, correct code consistently. If your model struggles with code generation, the benefits diminish quickly. Test your chosen model's coding capabilities before committing to this pattern.
+
+**Debugging is harder:** When a traditional tool call fails, you see exactly which tool was called and what it returned. When code execution fails, you need to debug the generated code itself—parsing errors, logic bugs, incorrect API usage. This adds complexity to your error handling and monitoring.
+
+**Security surface area:** Executing LLM-generated code introduces risks beyond traditional tool calling. Even with sandboxing, you need to worry about resource exhaustion, unintended file system access, infinite loops, and malicious prompt injections that generate harmful code. The guardrails mentioned earlier are necessary but not sufficient—you need ongoing monitoring and careful tool design.
+
+**Added latency:** Code execution requires the LLM to first generate code, then execute it, then process results. This adds a generation step that traditional tool calling skips. For simple queries where traditional tool calling would work fine, code execution may actually be slower.
+
+**Complexity:** Your system needs to manage an execution environment, handle code execution errors gracefully, and potentially deal with environment setup and dependencies. Traditional tool calling has a simpler operational model.
+
+Despite these trade-offs, for data-heavy tasks where token costs and context window limits are real constraints, code execution can provide significant practical benefits.
 
 ## The mental model shift
 
@@ -96,12 +112,15 @@ The context window is for reasoning. The execution environment is for working.
 
 When you structure agents this way, you get:
 
-- 80%+ reduction in token usage (demonstrated: 86k → 15k tokens)  
-- Natural patterns for polling and async operations  
-- Ability to process large datasets  
+- Significant reduction in token usage (varies by task, but can be substantial for data-heavy operations)
+- Natural patterns for polling and async operations
+- Ability to process large datasets
 - Stateful computation without context bloat
+- More predictable results by executing deterministic code rather than tracking state in context
 
-Code execution also improves accuracy. In my testing, traditional tool calling produced inconsistent results: miscounted records, incorrect averages, different answers each run due to mental math errors. Sometimes the agent didn't even fetch all the records. Code execution solves this by having the agent write deterministic scripts that produce reliable, complete results every time.
+Code execution can improve reliability by reducing the need for the LLM to track state and aggregate data across multiple tool calls in context. By having the agent write deterministic scripts that run in the execution environment, you get more predictable and complete results.
+
+**Note:** The effectiveness of this approach depends significantly on the model you use. Models with strong coding capabilities will write better, more efficient code. The token savings also vary based on your specific use case—tasks involving large datasets or many sequential operations see the most benefit.
 
 MCP provides the standardized tools. Code execution provides the workspace to use them efficiently. Together, they enable agents that are both capable and cost-effective.
 
@@ -109,10 +128,10 @@ MCP provides the standardized tools. Code execution provides the workspace to us
 
 I created a [demo repository](https://github.com/sarahcstringer/mcp-code-demo) with two examples you can run and play around with:
 
-1. **Traditional tool calling**: Shows how intermediate data fills the context window  
+1. **Traditional tool calling**: Shows how intermediate data fills the context window
 2. **Code execution**: Shows how processing happens in the execution environment
 
-Both examples include token usage metrics. If you run the traditional example multiple times, you might also see the results change due to accuracy issues. Then compare it to the consistent results from code execution.
+Both examples include token usage metrics so you can compare the approaches. Token savings will vary based on the model used and the specific task characteristics.
 
 To run the examples:
 

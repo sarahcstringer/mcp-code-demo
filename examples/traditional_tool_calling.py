@@ -15,8 +15,9 @@ HOW IT WORKS (traditional tool calling):
 6. All 300 records are now sitting in the context window
 7. Claude processes them in context (counting, filtering, averaging)
 
-RESULT: ~300 records × ~200 tokens per record = ~60,000 tokens just for intermediate data
-that only needed processing, not reasoning.
+RESULT: All intermediate data passes through the context window, consuming tokens for
+data that only needs processing, not reasoning. The actual token usage depends on the
+model and how it processes the tool results.
 """
 
 import os
@@ -82,17 +83,17 @@ def main():
     client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
     # System prompt
-    system_prompt = """You are a data analyst. You MUST complete this entire task:
+    system_prompt = """You are a data analyst. Your task is to:
 
-1. Call get_total_pages() to get the number of pages
-2. Call get_data_chunk(page) for EVERY SINGLE page from 1 to total_pages. If there are 30 pages, you MUST fetch all 30 pages. Do not stop early.
-3. Once you have fetched ALL pages, analyze the complete dataset to calculate:
+1. Call get_total_pages() to get the number of pages available
+2. Call get_data_chunk(page) for each page from 1 to total_pages to fetch all the data
+3. Analyze the complete dataset to calculate:
    - Total number of failed activities (where metadata.success == false)
    - Most active user (the user_id with the most activities)
    - Average duration of all activities (mean of metadata.duration_seconds)
 4. Return a summary with these three metrics
 
-CRITICAL: You must fetch ALL pages (page 1 through page total_pages). Do not stop at page 5 or any other arbitrary number. Complete the entire task."""
+Make sure to fetch all available pages to get the complete dataset for analysis."""
 
     print("Task: Fetch and analyze 30 pages of user activity data (300 records)")
     print("Approach: Traditional - each MCP tool call returns data to context window")
@@ -183,12 +184,9 @@ CRITICAL: You must fetch ALL pages (page 1 through page total_pages). Do not sto
     print(f"Total time:    {total_time:.2f}s")
     print()
 
-    print(
-        "Note: All 300 records from the MCP server passed through the context window,"
-    )
-    print(
-        "consuming significant tokens for intermediate data that only needed processing."
-    )
+    print("Note: All 300 records from the MCP server passed through the context window,")
+    print("consuming tokens for intermediate data that only needed processing.")
+    print("Token usage varies by model and task complexity.")
     print("=" * 80)
 
 
