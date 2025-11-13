@@ -138,16 +138,22 @@ Make sure to fetch all available pages to get the complete dataset for analysis.
                             f"  → Returned {len(result['result']['records'])} records to context"
                         )
 
+                    # Ensure content is never empty
+                    content = str(result["result"])
+                    if not content or not content.strip():
+                        content = "Error: Empty result"
+
                     tool_results.append(
                         {
                             "type": "tool_result",
                             "tool_use_id": block.id,
-                            "content": str(result["result"]),
+                            "content": content,
                         }
                     )
 
-            # Add tool results to messages
-            messages.append({"role": "user", "content": tool_results})
+            # Only add tool results if we have any
+            if tool_results:
+                messages.append({"role": "user", "content": tool_results})
         else:
             print(f"Unexpected stop reason: {response.stop_reason}")
             break

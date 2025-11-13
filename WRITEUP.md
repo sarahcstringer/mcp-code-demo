@@ -131,7 +131,13 @@ I created a [demo repository](https://github.com/sarahcstringer/mcp-code-demo) w
 1. **Traditional tool calling**: Shows how intermediate data fills the context window
 2. **Code execution**: Shows how processing happens in the execution environment
 
-Both examples include token usage metrics so you can compare the approaches. Token savings will vary based on the model used and the specific task characteristics.
+Both examples include token usage metrics so you can compare the approaches.
+
+**Note on token variability:** Token usage varies between runs, even with the same task and model. In my testing with this demo, I've seen the following results:
+
+- **Traditional tool calling**: Typically 50,000-73,000 tokens
+- **Code execution**: Typically 9,500-10,000 tokens
+- **Token reduction**: 80-87% depending on the run
 
 To run the examples:
 

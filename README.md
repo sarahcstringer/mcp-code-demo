@@ -116,6 +116,14 @@ This can significantly reduce token usage for data-heavy tasks while enabling ne
 
 **Security consideration:** When giving an LLM the ability to execute code, implement appropriate guardrails such as sandboxing, human-in-the-loop verification for sensitive operations, code review before execution, and limiting filesystem/network access. Only run code in environments where you can verify and trust what's being executed.
 
+## Token usage variability
+
+Token usage varies between runs, even with the same task and model. In testing with this demo, I've seen the following results:
+
+- **Traditional tool calling**: Typically 50,000-73,000 tokens
+- **Code execution**: Typically 9,500-10,000 tokens
+- **Token reduction**: 80-87% depending on the run
+
 ## Project structure
 
 ```
