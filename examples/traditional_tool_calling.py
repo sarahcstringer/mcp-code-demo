@@ -5,19 +5,6 @@ SCENARIO: Analyzing paginated API logs. Each API call returns 10 user activity
 records. There are 30 pages total (300 records).
 
 TASK: Calculate total failed activities, most active user, and average duration.
-
-HOW IT WORKS (traditional tool calling):
-1. MCP tools are passed to Claude as available tools
-2. Claude calls get_total_pages() → integer 30 → goes to context window
-3. Claude calls get_data_chunk(1) → 10 full JSON records → all go to context
-4. Claude calls get_data_chunk(2) → 10 more records → all go to context
-5. ... repeats for all 30 pages ...
-6. All 300 records are now sitting in the context window
-7. Claude processes them in context (counting, filtering, averaging)
-
-RESULT: All intermediate data passes through the context window, consuming tokens for
-data that only needs processing, not reasoning. The actual token usage depends on the
-model and how it processes the tool results.
 """
 
 import os
@@ -34,7 +21,7 @@ from mcp_tools import get_data_chunk, get_total_pages
 load_dotenv()
 
 
-# Define MCP tools for Claude (traditional approach)
+# Define MCP tools for Claude
 MCP_TOOLS = [
     {
         "name": "get_total_pages",
@@ -80,7 +67,7 @@ def main():
     print()
 
     # Initialize the Anthropic client
-    client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    client = Anthropic()
 
     # System prompt
     system_prompt = """You are a data analyst. Your task is to:
@@ -183,10 +170,6 @@ Make sure to fetch all available pages to get the complete dataset for analysis.
     print(f"Total tokens:  {total_input_tokens + total_output_tokens:,}")
     print(f"Total time:    {total_time:.2f}s")
     print()
-
-    print("Note: All 300 records from the MCP server passed through the context window,")
-    print("consuming tokens for intermediate data that only needed processing.")
-    print("Token usage varies by model and task complexity.")
     print("=" * 80)
 
 
