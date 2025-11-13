@@ -2,43 +2,11 @@
 Example 2: Code execution with MCP
 
 SCENARIO: Same as Example 1 - analyzing 300 paginated API log records across 30 pages.
-Same data structure, same task.
 
 TASK: Calculate total failed activities, most active user, and average duration.
 
-HOW IT WORKS (code execution + MCP):
-1. Agent connects to Data Tools MCP server
-2. Agent has BOTH python_repl (code execution) AND MCP tools available
-3. Agent can discover what MCP tools are available by listing them
-4. Agent writes Python code that CALLS THE MCP TOOLS directly:
-
-   # MCP tools are available as callable functions in the execution environment
-   total = get_total_pages()  # Calls MCP tool
-   all_records = []
-   for page in range(1, total + 1):
-       data = get_data_chunk(page)  # Calls MCP tool - gets dict with 10 records
-       all_records.extend(data['records'])
-
-   # Process locally in execution environment
-   failed = sum(1 for r in all_records if not r['metadata']['success'])
-   user_counts = {}
-   for r in all_records:
-       user_counts[r['user_id']] = user_counts.get(r['user_id'], 0) + 1
-   most_active = max(user_counts.items(), key=lambda x: x[1])
-   avg = sum(r['metadata']['duration_seconds'] for r in all_records) / len(all_records)
-
-   print(f"Failed: {failed}, Most active: {most_active[0]}, Avg: {avg:.1f}s")
-
-5. Code runs in execution environment
-6. MCP tool calls happen IN THE EXECUTION ENVIRONMENT (not in context!)
-7. All 300 JSON records are fetched via MCP and processed in execution environment
-8. Only the final 3-line summary string goes back to context window
-
-KEY INSIGHT: MCP + code execution means MCP tool results stay in execution
-environment and never hit the context window. This is the whole point!
-
-RESULT: The 300 records never enter context. MCP provides the standardized
-interface to external tools, code execution provides the processing environment.
+KEY DIFFERENCE: MCP + code execution means MCP tool results stay in execution
+environment and never hit the context window.
 """
 
 import os
@@ -66,7 +34,14 @@ BASH_TOOL = {
 
 
 def execute_bash(command: str) -> str:
-    """Execute a bash command and return output."""
+    """
+    Execute a bash command and return output.
+
+    SECURITY NOTE: Be extremely cautious when enabling bash command execution from user or agent input.
+    Executing arbitrary commands can be dangerous and may lead to privilege escalation, sensitive data exposure,
+    or system compromise. Always validate input, restrict available commands, and run in a sandboxed environment
+    when possible. This function is for demonstration purposes only.
+    """
     try:
         result = subprocess.run(
             command, shell=True, capture_output=True, text=True, timeout=30
@@ -77,7 +52,8 @@ def execute_bash(command: str) -> str:
         return output
     except subprocess.TimeoutExpired:
         return "Command timed out after 30 seconds"
-    except Exception as e:
+    except (OSError, ValueError) as e:
+        # OSError: command execution issues, ValueError: invalid arguments
         return f"Error executing command: {str(e)}"
 
 
@@ -89,25 +65,20 @@ def main():
     print("=" * 80)
     print("EXAMPLE 2: CODE EXECUTION WITH MCP")
     print("=" * 80)
-    print("\nNo direct MCP connection - agent will discover tools via file system!")
+    print("\nAgent will discover tools via file system")
     print()
 
     # Initialize the Anthropic client
-    client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    client = Anthropic()
 
     # System prompt
     system_prompt = """You are a data analyst with bash command execution capabilities.
 
 You have access to a Python execution environment with MCP tool wrappers available on the file system.
 
-Explore the 'mcp_tools' directory to see what's available. You can:
-1. List files to see available modules
-2. Read the Python files to understand what functions they expose
-3. Import and use those functions in your code
-
 Your task is to:
-1. Explore mcp_tools/ to discover available tools
-2. Write Python code that imports and uses the tools to fetch all data pages
+1. Explore mcp_tools/ to discover available tools related to the task
+2. Write Python code that imports and uses the tools to fetch all data pages and process the data
 3. Process the data in the execution environment to calculate:
    - Total number of failed activities (where metadata['success'] == False)
    - Most active user (user_id with most activities)
@@ -180,6 +151,10 @@ Process ALL data in your code. Don't return raw records - only the final summary
                     # Execute the bash command
                     result = execute_bash(command)
 
+                    # Ensure result is never empty
+                    if not result or not result.strip():
+                        result = "(Command executed successfully with no output)"
+
                     tool_results.append(
                         {
                             "type": "tool_result",
@@ -212,10 +187,6 @@ Process ALL data in your code. Don't return raw records - only the final summary
     print(f"Total tokens:  {total_input_tokens + total_output_tokens:,}")
     print(f"Total time:    {total_time:.2f}s")
     print()
-
-    print("Note: Agent discovered MCP tools via file system and called them from code.")
-    print("The 300 records from the MCP server never entered the context window.")
-    print("This demonstrates MCP + code execution following Anthropic's pattern!")
     print("=" * 80)
 
 

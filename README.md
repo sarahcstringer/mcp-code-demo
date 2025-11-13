@@ -4,7 +4,7 @@ This repository demonstrates the key difference between traditional tool calling
 
 This demo is based on blog posts from [Anthropic](https://www.anthropic.com/engineering/code-execution-with-mcp) and [Cloudflare](https://blog.cloudflare.com/code-mode/) about code execution with MCP.
 
-The examples here use a local MCP server to demonstrate the full MCP + code execution stack. The MCP server simulates latency and provides synthetic data. Run the demos below or read the [writeup](WRITEUP.md) for more details about the concepts.
+The examples here use a local MCP server to demonstrate the full MCP + code execution stack. The MCP server simulates latency and provides synthetic data. Run the demos below or read the [full writeup](WRITEUP.md) for more details about the concepts.
 
 ## Run the demos
 
@@ -92,7 +92,7 @@ This example demonstrates traditional MCP tool calling where all tool results pa
 python examples/code_execution.py
 ```
 
-> **Note:**: you must generate the `mcp_tools/` directory first by running `python generate_wrappers.py`
+> **Note**: you must generate the `mcp_tools/` directory first by running `python generate_wrappers.py`
 
 This example does the same task as the previous example, but with code execution instead of traditional tool calling. It follows [Anthropic's pattern](https://www.anthropic.com/engineering/code-execution-with-mcp) for using code execution with MCP.
 
@@ -131,7 +131,6 @@ mcp-code/
 │   └── data_tools.py                # Wrappers for data_tools MCP server
 ├── generate_wrappers.py             # Script to generate mcp_tools/ from MCP servers
 ├── WRITEUP.md                       # Writeup of the demo and my thoughts on the concepts
-├── COMPARISON.md                    # Visual comparison of approaches
 ├── README.md                        # This file
 └── requirements.txt                 # Python dependencies
 ```
