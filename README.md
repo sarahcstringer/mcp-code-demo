@@ -4,21 +4,13 @@ This repository demonstrates the key difference between traditional tool calling
 
 This demo is based blog posts from [Anthropic](https://www.anthropic.com/engineering/code-execution-with-mcp) and [Cloudflare](https://blog.cloudflare.com/code-mode/) about code execution with MCP.
 
-The examples here use a local MCP server to demonstrate the full MCP + code execution stack. The MCP server simulates latency and provides synthetic data.
-
-## The core insight
-
-**Traditional tool calling** loads all MCP tool descriptions, parameter schemas, return types, and usage instructions into the context window upfront. Then it sends all intermediate results through the LLM's context window as the agent orchestrates tool calls one by one.
-
-**Code execution** allows dynamic discovery—the agent explores the file system to find available tools and reads their implementations. It runs processing in a separate execution environment and only sends final results back to context.
-
-This can reduce token usage by 80+% while enabling new capabilities like polling, waiting, and stateful processing.
-
-**Demo scenario:** Both examples analyze paginated user activity logs from an MCP server. The task is to calculate total failed activities, identify the most active user, and compute average duration across 300 records (30 pages of 10 records each).
-
-![Comparison diagram showing traditional tool calling with all operations in the context window versus code execution with a separate execution environment for processing, demonstrating 82% token reduction](./mcp-code.png)
+The examples here use a local MCP server to demonstrate the full MCP + code execution stack. The MCP server simulates latency and provides synthetic data. Run the demos below or read the [writeup](WRITEUP.md) for more details about the concepts.
 
 ## Run the demos
+
+This demo shows two examples of using MCP + code execution. The first example uses traditional tool calling, where all tool results pass through the context window. The second example uses code execution, where the agent writes code that calls the MCP tools directly in an execution environment.
+
+It uses a local MCP server (`mcp_servers/data_mcp_server.py`) that exposes an API for fetching paginated data about synthetic user activity. The server introduces a 100ms delay to simulate latency in a real API.
 
 ### Prerequisites
 
@@ -56,19 +48,13 @@ python generate_wrappers.py
 
 > The MCP tool wrappers are used for the code execution MCP example. 
 
-### About the MCP server in this demo
-
-This demo uses a local MCP server to demonstrate the full MCP + code execution stack:
-
-**Local MCP server:**
-- `mcp_servers/data_mcp_server.py` - MCP server exposing paginated data fetching tools (with simulated latency and synthetic data)
-- Built with FastMCP (`@mcp.tool()` decorators)
-- Run as actual MCP server via stdio transport
-- No external dependencies or authentication required
-
 ### Examples
 
 ### Example 1: Traditional MCP tool calling
+
+```bash
+python examples/traditional_tool_calling.py
+```
 
 This example demonstrates traditional MCP tool calling where all tool results pass through the context window. The agent analyzes paginated API logs by fetching user activity data from an MCP server.
 
@@ -102,17 +88,19 @@ This example demonstrates traditional MCP tool calling where all tool results pa
 - Agent processes this data in context (counting failures, grouping by user, averaging durations)
 - Every MCP tool result consumes context window tokens (~60,000 tokens just for the data)
 
-```bash
-python examples/traditional_tool_calling.py
-```
-
 ### Example 2: Code execution with MCP
 
-This example does the exact same task as the previous example, but with code execution enabled following [Anthropic's pattern](https://www.anthropic.com/engineering/code-execution-with-mcp).
+```bash
+python examples/code_execution.py
+```
+
+> **Note:**: you must generate the `mcp_tools/` directory first by running `python generate_wrappers.py`
+
+This example does the same task as the previous example, but with code execution instead of traditional tool calling. It follows [Anthropic's pattern](https://www.anthropic.com/engineering/code-execution-with-mcp) for using code execution with MCP.
 
 **What happens:**
 - Agent has access to bash tool (code execution environment)
-- NO MCP tools passed directly to agent - agent must discover them
+- No MCP tools passed directly to agent - agent must discover them via the file system
 - Agent explores the file system and discovers `mcp_tools/` directory
 - Agent reads the Python wrapper files to understand available functions
 - Agent writes bash commands that execute Python code importing and calling the MCP wrappers:
@@ -137,19 +125,19 @@ This example does the exact same task as the previous example, but with code exe
 - Only the final summary string (3 lines) goes back to context
 - Token savings: ~50,000 tokens avoided by keeping data out of context
 
-**Requires:** `python generate_wrappers.py` to create the `mcp_tools/` directory first
+## The core insight
 
-To run the code execution example:
+**Traditional tool calling** loads all MCP tool descriptions, parameter schemas, return types, and usage instructions into the context window upfront. Then it sends all intermediate results through the LLM's context window as the agent orchestrates tool calls one by one.
 
-```bash
-python examples/code_execution.py
-```
+**Code execution** allows dynamic discovery—the agent explores the file system to find available tools and reads their implementations. It runs processing in a separate execution environment and only sends final results back to context.
 
-## Model
+This can reduce token usage by 80+% while enabling new capabilities like polling, waiting, and stateful processing.
 
-This demo uses Anthropic's Claude Haiku 4 (`claude-haiku-4-5`) with an agent loop implemented using the Anthropic Python SDK. No agent frameworks required - just direct API calls with bash tool for code execution.
+**Demo scenario:** Both examples analyze paginated user activity logs from an MCP server. The task is to calculate total failed activities, identify the most active user, and compute average duration across 300 records (30 pages of 10 records each).
 
-**Implementation note:** Modern agent frameworks like [Claude Code](https://www.anthropic.com/engineering/code-execution-with-mcp) and [Cloudflare Agents](https://blog.cloudflare.com/code-mode/) provide code execution environments built-in. However, you can achieve the same pattern by simply giving any LLM a bash tool that executes commands - this is the approach used in these examples.
+![Comparison diagram showing traditional tool calling with all operations in the context window versus code execution with a separate execution environment for processing, demonstrating 82% token reduction](./mcp-code.png)
+
+**Implementation note:** Modern agent frameworks like [Claude Code](https://www.anthropic.com/engineering/code-execution-with-mcp) and [Cloudflare Agents](https://blog.cloudflare.com/code-mode/) provide code execution environments built-in. However, you can achieve the same pattern by giving an LLM a bash tool that executes commands - this is the approach used in these examples.
 
 **Security consideration:** When giving an LLM the ability to execute code, implement appropriate guardrails such as sandboxing, human-in-the-loop verification for sensitive operations, code review before execution, and limiting filesystem/network access. Only run code in environments where you can verify and trust what's being executed.
 
