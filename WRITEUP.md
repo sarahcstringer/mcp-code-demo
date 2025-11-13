@@ -90,15 +90,13 @@ Not every task needs code execution. Traditional tool calling works well for cer
 
 ## Limitations and trade-offs
 
-Code execution isn't without its challenges:
+Code execution has some trade-offs (and at least to me, this is such a new concept that there are a lot of things I'm haven't thought through yet):
 
 **Model capability matters:** Code execution requires models with strong coding abilities. Not all LLMs write clean, correct code consistently. If your model struggles with code generation, the benefits diminish quickly. Test your chosen model's coding capabilities before committing to this pattern.
 
-**Debugging is harder:** When a traditional tool call fails, you see exactly which tool was called and what it returned. When code execution fails, you need to debug the generated code itself—parsing errors, logic bugs, incorrect API usage. This adds complexity to your error handling and monitoring.
+**Non-deterministic code:** Traditional tool calling shows you which tools are called, with what arguments, and what they return. Code execution is opaque; the LLM generates code dynamically, and that code can be different each time for the same prompt. You don't know what it will write until it writes it, and once it's executing in the environment, you lose visibility into the step-by-step operations. 
 
-**Security surface area:** Executing LLM-generated code introduces risks beyond traditional tool calling. Even with sandboxing, you need to worry about resource exhaustion, unintended file system access, infinite loops, and malicious prompt injections that generate harmful code. The guardrails mentioned earlier are necessary but not sufficient—you need ongoing monitoring and careful tool design.
-
-**Added latency:** Code execution requires the LLM to first generate code, then execute it, then process results. This adds a generation step that traditional tool calling skips. For simple queries where traditional tool calling would work fine, code execution may actually be slower.
+**Security surface area:** Executing LLM-generated code introduces risks beyond traditional tool calling. Even with sandboxing, you need to worry about resource exhaustion, unintended file system access, infinite loops, and malicious prompt injections that generate harmful code. The guardrails mentioned earlier are necessary but not sufficient; you need ongoing monitoring and careful tool design.
 
 **Complexity:** Your system needs to manage an execution environment, handle code execution errors gracefully, and potentially deal with environment setup and dependencies. Traditional tool calling has a simpler operational model.
 
